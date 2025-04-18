@@ -49,3 +49,28 @@ def calc_from_diag(mat:np.ndarray, function):
             calc_mat[r,c] = temp
             calc_mat[c,r] = temp
     return calc_mat
+
+def determine_rank_cutoff(svs:list[float]):
+    angle_list = []
+    sv_pair_list = []
+
+    angle_diff_list = []
+    line_seg_pair_list = [] # line segment number 0 consists of points (0,1), line segment number 1 consists of points (1,2)
+    def calc_angle(y0, y1): # assumes x1 - x0 = 1
+        x1 = 1
+        x0 = 0
+        delta_x = x1 - x0
+        delta_y = y1 - y0
+        return np.arctan(delta_y / delta_x) / np.pi * 180
+    for i in range(len(svs) - 1):
+        angle_list.append(calc_angle(svs[i], svs[i+1]))
+        sv_pair_list.append((i, i+1))
+    line_0_index = 0
+    for i in range(1, len(angle_list)):
+        line_1_angle = angle_list[i]
+        if (np.abs(line_1_angle) < 0.001): # if next sv is flat
+            continue
+        angle_diff_list.append(line_1_angle - angle_list[line_0_index])
+        line_seg_pair_list.append((line_0_index, i))
+        line_0_index = i
+    return ({'angles': angle_diff_list, 'points': line_seg_pair_list})
