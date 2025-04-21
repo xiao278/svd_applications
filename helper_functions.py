@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import norm
 
 def sum_from_diag(A:np.ndarray):
     '''Returns a matrix where each (i,j) is the sum of all cells of the **square** input matrix between and including (i,j) and (j,i)'''
@@ -50,27 +51,43 @@ def calc_from_diag(mat:np.ndarray, function):
             calc_mat[c,r] = temp
     return calc_mat
 
-def determine_rank_cutoff(svs:list[float]):
-    angle_list = []
-    sv_pair_list = []
+def calc_cutoff_likelihoods(svs:list[float]):
+    svs = np.array(svs)
+    p = svs.shape[0] # how many total singular values are we dealing with
+    samp_means = np.zeros((p + 1, 2))
+    samp_vars = np.zeros((p + 1, 2))
+    # calculate sample mean and variance for pre and post cutoff segments assuming q is the cutoff
+    for q in range(1, p + 1):
+        samp_means[q,0] = np.mean(svs[0:q])
+        samp_means[q,1] = np.mean(svs[q:p])
 
-    angle_diff_list = []
-    line_seg_pair_list = [] # line segment number 0 consists of points (0,1), line segment number 1 consists of points (1,2)
-    def calc_angle(y0, y1): # assumes x1 - x0 = 1
-        x1 = 1
-        x0 = 0
-        delta_x = x1 - x0
-        delta_y = y1 - y0
-        return np.arctan(delta_y / delta_x) / np.pi * 180
-    for i in range(len(svs) - 1):
-        angle_list.append(calc_angle(svs[i], svs[i+1]))
-        sv_pair_list.append((i, i+1))
-    line_0_index = 0
-    for i in range(1, len(angle_list)):
-        line_1_angle = angle_list[i]
-        if (np.abs(line_1_angle) < 0.001): # if next sv is flat
-            continue
-        angle_diff_list.append(line_1_angle - angle_list[line_0_index])
-        line_seg_pair_list.append((line_0_index, i))
-        line_0_index = i
-    return ({'angles': angle_diff_list, 'points': line_seg_pair_list})
+        samp_vars[q,0] = np.var(svs[0:q])
+        samp_vars[q,1] = np.var(svs[q:p])
+
+    def total_log_likelihood(x:np.ndarray, mean:float, std:float):
+        return np.sum(
+            np.log(
+                norm.pdf(x, loc=mean, scale=std)
+            )
+        )
+
+    LL = np.zeros((p,))
+    # calculate log likelihood
+    for q in range(1, p):
+        combined_var = (
+            (q - 1) * samp_vars[q,0] + (p - q - 1) * samp_vars[q,1]
+        ) / (p - 2)
+        combined_std = np.sqrt(combined_var)
+        LL[q-1] = (
+            total_log_likelihood(svs[0:q], mean=samp_means[q,0], std=combined_std)
+            +
+            total_log_likelihood(svs[q:p], mean=samp_means[q,1], std=combined_std)
+        )
+    LL[p-1] = total_log_likelihood(svs, mean=samp_means[p-1,0], std=np.sqrt(samp_vars[p-1,0]))
+
+    return LL
+
+# likelihoods_test = np.array([
+#     10, 9, 3, 2, 1
+# ])
+# should be [-12.27178365  -5.36541382 -11.51601249 -12.90901428 -13.90901428]
