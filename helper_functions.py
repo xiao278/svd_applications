@@ -59,10 +59,11 @@ def calc_cutoff_likelihoods(svs:list[float]):
     # calculate sample mean and variance for pre and post cutoff segments assuming q is the cutoff
     for q in range(1, p + 1):
         samp_means[q,0] = np.mean(svs[0:q])
-        samp_means[q,1] = np.mean(svs[q:p])
-
         samp_vars[q,0] = np.var(svs[0:q])
-        samp_vars[q,1] = np.var(svs[q:p])
+
+        if q < p:
+            samp_means[q,1] = np.mean(svs[q:p])
+            samp_vars[q,1] = np.var(svs[q:p])
 
     def total_log_likelihood(x:np.ndarray, mean:float, std:float):
         return np.sum(
@@ -86,6 +87,23 @@ def calc_cutoff_likelihoods(svs:list[float]):
     LL[p-1] = total_log_likelihood(svs, mean=samp_means[p-1,0], std=np.sqrt(samp_vars[p-1,0]))
 
     return LL
+
+def calc_cutoff_index(svs:list[float]):
+    distinct_sv_idx = [] # multiple singular value are the same this will only include the index of the last one
+    def is_same(a,b,tol=1e-8):
+        return abs(a - b) / max(abs(a), abs(b)) < tol
+    group_starting_value = svs[0]
+    for i in range(1, len(svs)):
+        if is_same(group_starting_value, svs[i]):
+            continue
+        group_starting_value = svs[i]
+        distinct_sv_idx.append(i - 1)
+    if distinct_sv_idx[len(distinct_sv_idx) - 1] != len(svs) - 1:
+        distinct_sv_idx.append(len(svs) - 1)
+    distinct_sv = [svs[idx] for idx in distinct_sv_idx]
+    LL = calc_cutoff_likelihoods(distinct_sv)
+    best_cutoff_idx = np.argmax(LL)
+    return distinct_sv_idx[best_cutoff_idx]
 
 # likelihoods_test = np.array([
 #     10, 9, 3, 2, 1
