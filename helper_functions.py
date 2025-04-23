@@ -55,7 +55,7 @@ def var_from_diag(A:np.ndarray):
     V = (
         (sum_squared) - (N * np.square(M))
     ) / (N - 1)
-    np.fill_diagonal(V,np.diag(V,k=1))
+    np.fill_diagonal(V,np.diag(V,k=1) / 2)
     V = np.clip(V, a_min=0, a_max=None)
     return V
 
@@ -170,13 +170,13 @@ def find_clusters(A:np.ndarray, sigma_tolerance = 1):
             cursor_col += 1
         else:
             if prev_move_right:
-                clusters.append(range(cursor_row, cursor_col))
+                clusters.append(range(cursor_row, cursor_col + 1))
             prev_move_right = False
-            cursor_row += 1
             if cursor_row == cursor_col:
                 cursor_col += 1
-    if cursor_row < cursor_col:
-        clusters.append(range(cursor_row, cursor_col))
+            cursor_row += 1
+    if prev_move_right:
+        clusters.append(range(cursor_row, cursor_col + 1))
     return clusters
 
     
