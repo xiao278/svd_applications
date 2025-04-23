@@ -50,14 +50,14 @@ def var_from_diag(A:np.ndarray):
     sum_squared = sum_from_diag(np.square(A))
     S = sum_from_diag(A)
     N = size_from_diag(A)
-    np.fill_diagonal(N, np.var(A, ddof=1))
+    np.fill_diagonal(N, 2)
     M = S / N
     V = (
         (sum_squared) - (N * np.square(M))
     ) / (N - 1)
-    
+    np.fill_diagonal(V,np.diag(V,k=1))
+    V = np.clip(V, a_min=0, a_max=None)
     return V
-    
 
 def calc_from_diag(mat:np.ndarray, function):
     '''Returns a matrix where each (i,j) is the specified function run on all cells of the input matrix between and including (i,j) and (j,i). WARNING: SLOW'''
@@ -132,18 +132,24 @@ def calc_cutoff_index(svs:list[float]):
 # ])
 # should be [-12.27178365  -5.36541382 -11.51601249 -12.90901428 -13.90901428]
 
-def detect_cluster_structure(A:np.ndarray):
+def detect_cluster_structure(A:np.ndarray, sigma_tolerance):
     # start with n - 1 'active' cells one above the diagonal
     n = A.shape[0]
     C = np.zeros(A.shape)
-    threshold = np.mean(A)
-    np.fill_diagonal(C, (np.diagonal(A) > threshold).astype(int))
+    M = mean_from_diag(A)
+    V = np.sqrt(var_from_diag(A))
+    np.fill_diagonal(C, 1)
+
+    def should_join_clusters(r,c):
+        combined_std = np.sqrt((V[r+1,c] + V[r,c-1]) / 2)
+        combined_mean = (M[r+1,c] + M[r,c-1]) / 2
+        return (abs(combined_mean - A[r,c]) < combined_std * sigma_tolerance) and A[r,c] > A[0,-1]
 
     for d in range(1, n):
         for k in range(0,n - d):
             r = k
             c = d + k
-            if (A[r,c] > threshold) and (C[r+1,c] == 1) and (C[r,c-1] == 1):
+            if should_join_clusters(r,c) and (C[r+1,c] == 1) and (C[r,c-1] == 1):
                 C[r,c] = 1
                 C[c,r] = 1
             else:
@@ -151,8 +157,8 @@ def detect_cluster_structure(A:np.ndarray):
                 C[c,r] = 0
     return C
 
-def find_clusters(A:np.ndarray):
-    structure = detect_cluster_structure(A)
+def find_clusters(A:np.ndarray, sigma_tolerance = 1):
+    structure = detect_cluster_structure(A, sigma_tolerance=sigma_tolerance)
     clusters = []
     n = A.shape[0]
     cursor_row = 0
