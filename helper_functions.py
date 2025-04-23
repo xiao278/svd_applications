@@ -109,3 +109,50 @@ def calc_cutoff_index(svs:list[float]):
 #     10, 9, 3, 2, 1
 # ])
 # should be [-12.27178365  -5.36541382 -11.51601249 -12.90901428 -13.90901428]
+
+def detect_cluster_structure(A:np.ndarray):
+    # start with n - 1 'active' cells one above the diagonal
+    n = A.shape[0]
+    C = np.zeros(A.shape)
+    threshold = np.mean(A)
+    np.fill_diagonal(C, (np.diagonal(A) > threshold).astype(int))
+
+    for d in range(1, n):
+        for k in range(0,n - d):
+            r = k
+            c = d + k
+            if (A[r,c] > threshold) and (C[r+1,c] == 1) and (C[r,c-1] == 1):
+                C[r,c] = 1
+                C[c,r] = 1
+            else:
+                C[r,c] = 0
+                C[c,r] = 0
+    return C
+
+def find_clusters(A:np.ndarray):
+    structure = detect_cluster_structure(A)
+    clusters = []
+    n = A.shape[0]
+    cursor_row = 0
+    cursor_col = 0
+    prev_move_right = False
+    while(cursor_col < n - 1):
+        if (structure[cursor_row, cursor_col + 1] > 0.5):
+            prev_move_right = True
+            cursor_col += 1
+        else:
+            if prev_move_right:
+                clusters.append(range(cursor_row, cursor_col))
+            prev_move_right = False
+            cursor_row += 1
+            if cursor_row == cursor_col:
+                cursor_col += 1
+    if cursor_row < cursor_col:
+        clusters.append(range(cursor_row, cursor_col))
+    return clusters
+
+    
+
+            
+            
+        
