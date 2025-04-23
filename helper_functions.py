@@ -23,19 +23,41 @@ def sum_from_diag(A:np.ndarray):
             S[c,r] = total
     return S
 
-def mean_from_diag(A:np.ndarray):
+def size_from_diag(A:np.ndarray):
     assert A.ndim == 2
     assert A.shape[0] == A.shape[1]
     n = A.shape[0]
-    M = np.zeros(A.shape)
-    np.fill_diagonal(M, 1)
+    N = np.zeros(A.shape)
+    np.fill_diagonal(N, 1)
     for r in range(n):
         for c in range(r+1,n):
             size = (c - r + 1) ** 2
-            M[r,c] = size
-            M[c,r] = size
+            N[r,c] = size
+            N[c,r] = size
+    return N
+
+def mean_from_diag(A:np.ndarray):
+    assert A.ndim == 2
+    assert A.shape[0] == A.shape[1]
     S = sum_from_diag(A)
-    return S / M
+    N = size_from_diag(A)
+    return S / N
+
+def var_from_diag(A:np.ndarray):
+    assert A.ndim == 2
+    assert A.shape[0] == A.shape[1]
+    n = A.shape[0]
+    sum_squared = sum_from_diag(np.square(A))
+    S = sum_from_diag(A)
+    N = size_from_diag(A)
+    np.fill_diagonal(N, np.var(A, ddof=1))
+    M = S / N
+    V = (
+        (sum_squared) - (N * np.square(M))
+    ) / (N - 1)
+    
+    return V
+    
 
 def calc_from_diag(mat:np.ndarray, function):
     '''Returns a matrix where each (i,j) is the specified function run on all cells of the input matrix between and including (i,j) and (j,i). WARNING: SLOW'''
