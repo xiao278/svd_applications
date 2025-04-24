@@ -139,6 +139,11 @@ def detect_cluster_structure(A:np.ndarray, sigma_tolerance):
     M = mean_from_diag(A)
     V = np.sqrt(var_from_diag(A))
     np.fill_diagonal(C, 1)
+    # TODO: implement weighted update for mean and variance
+    # CUM_M = np.zeros(A.shape) # cumulative mean
+    # CUM_V = np.zeros(A.shape) # cumulative variance
+    # np.fill_diagonal(CUM_M, np.diag(M))
+    # np.fill_diagonal(CUM_V, np.diag(V))
 
     def should_join_clusters(r,c):
         combined_std = np.sqrt((V[r+1,c] + V[r,c-1]) / 2)
