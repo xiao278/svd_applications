@@ -19,6 +19,7 @@ def calc_weights(v_term, lambda_max, M=1e5):
     return k_frequency / M
 
 def calc_elbow(svs, conf=0.90):
+    '''Implemented using https://arxiv.org/abs/2308.09108'''
     assert conf < 1
     assert conf > 0
     l_max = calc_lambda_max(svs)
