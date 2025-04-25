@@ -103,19 +103,14 @@ def detect_cluster_structure(A:np.ndarray, sigma_tolerance = 0.05, debug=False):
                 variance = ex_moo2 / ex_cu_weight
                 distance = abs(ex_mean - A[r,c])
                 if d == 1:
-                    should_include = A[r,c] > total_mean + np.sqrt(total_var)
+                    should_include = A[r,c] > total_mean + np.sqrt(total_var) # maybe think of a better one
                 else:
-                    # weighted_std = np.sqrt(
-                    #     (
-                    #         (variance * ex_cu_weight ** 2) + (total_var * n ** 2)
-                    #     ) / (ex_cu_weight ** 2 + n ** 2)
-                    # )
-                    should_include = distance < np.sqrt(1 / variance) * sigma_tolerance
+                    should_include = distance < np.sqrt(1 / variance) * sigma_tolerance # 1 / var should be used rather than variance otherwise very uniform groups would have tight thresholds and messy groups have very loose thresholds. This creates clusters exactly where they shouldnt be. (between two squares)
                 if should_include:
                     if d == 1:
                         weight = 1
                     else:
-                        weight = np.exp(- distance / (2 * total_var))
+                        weight = np.exp(- distance / (2 * total_var)) # fixed variance to prevent runaway-pickups. 1/var makes it too restrictive on larger graphs
                     (cu_weight, mean, moo2) = update_aggregates(existing_agg, A[r,c], 2 * weight)
                     W[r,c] = cu_weight
                     W[c,r] = cu_weight
