@@ -76,65 +76,6 @@ def calc_from_diag(mat:np.ndarray, function):
             calc_mat[c,r] = temp
     return calc_mat
 
-def calc_cutoff_likelihoods(svs:list[float]):
-    svs = np.array(svs)
-    p = svs.shape[0] # how many total singular values are we dealing with
-    samp_means = np.zeros((p + 1, 2))
-    samp_vars = np.zeros((p + 1, 2))
-    # calculate sample mean and variance for pre and post cutoff segments assuming q is the cutoff
-    for q in range(1, p + 1):
-        samp_means[q,0] = np.mean(svs[0:q])
-        samp_vars[q,0] = np.var(svs[0:q])
-
-        if q < p:
-            samp_means[q,1] = np.mean(svs[q:p])
-            samp_vars[q,1] = np.var(svs[q:p])
-
-    def total_log_likelihood(x:np.ndarray, mean:float, std:float):
-        return np.sum(
-            np.log(
-                norm.pdf(x, loc=mean, scale=std)
-            )
-        )
-
-    LL = np.zeros((p,))
-    # calculate log likelihood
-    for q in range(1, p):
-        combined_var = (
-            (q - 1) * samp_vars[q,0] + (p - q - 1) * samp_vars[q,1]
-        ) / (p - 2)
-        combined_std = np.sqrt(combined_var)
-        LL[q-1] = (
-            total_log_likelihood(svs[0:q], mean=samp_means[q,0], std=combined_std)
-            +
-            total_log_likelihood(svs[q:p], mean=samp_means[q,1], std=combined_std)
-        )
-    LL[p-1] = total_log_likelihood(svs, mean=samp_means[p-1,0], std=np.sqrt(samp_vars[p-1,0]))
-
-    return LL
-
-def calc_cutoff_index(svs:list[float]):
-    distinct_sv_idx = [] # multiple singular value are the same this will only include the index of the last one
-    def is_same(a,b,tol=1e-8):
-        return abs(a - b) / max(abs(a), abs(b)) < tol
-    group_starting_value = svs[0]
-    for i in range(1, len(svs)):
-        if is_same(group_starting_value, svs[i]):
-            continue
-        group_starting_value = svs[i]
-        distinct_sv_idx.append(i - 1)
-    if distinct_sv_idx[len(distinct_sv_idx) - 1] != len(svs) - 1:
-        distinct_sv_idx.append(len(svs) - 1)
-    distinct_sv = [svs[idx] for idx in distinct_sv_idx]
-    LL = calc_cutoff_likelihoods(distinct_sv)
-    best_cutoff_idx = np.argmax(LL)
-    return distinct_sv_idx[best_cutoff_idx]
-
-# likelihoods_test = np.array([
-#     10, 9, 3, 2, 1
-# ])
-# should be [-12.27178365  -5.36541382 -11.51601249 -12.90901428 -13.90901428]
-
 def detect_cluster_structure_old(A:np.ndarray, sigma_tolerance):
     '''deprecated'''
     # start with n - 1 'active' cells one above the diagonal
@@ -166,7 +107,7 @@ def detect_cluster_structure_old(A:np.ndarray, sigma_tolerance):
                 C[c,r] = 0
     return C
 
-def find_clusters(structure:np.ndarray):
+def find_clusters(structure:np.ndarray, min_cluster_size = 3):
     clusters = []
     n = structure.shape[0]
     cursor_row = 0
@@ -177,18 +118,55 @@ def find_clusters(structure:np.ndarray):
             prev_move_right = True
             cursor_col += 1
         else:
-            if prev_move_right:
+            if prev_move_right and np.abs(cursor_row - cursor_col) + 1 >= min_cluster_size:
                 clusters.append(range(cursor_row, cursor_col + 1))
             prev_move_right = False
             if cursor_row == cursor_col:
                 cursor_col += 1
             cursor_row += 1
-    if prev_move_right:
+    if prev_move_right and np.abs(cursor_row - cursor_col) + 1 >= min_cluster_size:
         clusters.append(range(cursor_row, cursor_col + 1))
     return clusters
 
-    
+def reorder_cosine_matrix(CM:np.ndarray, index=False):
+    '''
+    Takes a cosine matrix and returns a reordered copy of it. if index=True, returns a tuple (CM_REORDERED, INDEX) instead
+    implmented from https://www.researchgate.net/publication/51152953_Community_detection_in_graphs_using_singular_value_decomposition
+    '''
+    INDEX = [] # global reordering index
+    CM_COPY = CM.copy()
+    indices = list(range(0,CM.shape[1]))
+    while(len(indices) > 1):
+        # sort by cosine similarity
+        similarity_list = CM_COPY[0,:]
+        new_indices = np.argsort(similarity_list)[::-1]
+        
+        # rearrange matrix
+        indices = [indices[i] for i in new_indices]
+        CM_COPY = CM_COPY[np.ix_(new_indices,new_indices)]
 
-            
+        # remove and update
+        INDEX.append(indices[0])
+        indices.pop(0)
+        CM_COPY = CM_COPY[1:,1:]
+    INDEX.append(indices[0])
+    CM_REORDERED = CM[np.ix_(INDEX, INDEX)]
+    if index:
+        return (CM_REORDERED, INDEX)
+    else:
+        return CM_REORDERED
+
+def compute_cosine_matrix(S:np.ndarray,V:np.ndarray,m,n):
+    CM = np.zeros((m,n))
+    vectors = S @ V.T
+    for i in range(0,vectors.shape[1]):
+        for j in range(i+1, vectors.shape[1]):
+            u = vectors[:,i]
+            v = vectors[:,j]
+            cosine = np.dot(u, v) / (np.linalg.norm(u) * np.linalg.norm(v))
+            CM[i,j] = cosine
+            CM[j,i] = cosine
+    np.fill_diagonal(CM, 1)
+    return CM
             
         

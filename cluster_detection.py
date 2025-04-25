@@ -43,7 +43,7 @@ def init_agg_matrices(A:np.ndarray):
     return (W, M, M2)
 
 def weighted_welford_example(A:np.ndarray):
-    '''implemented from welfords algorithm'''
+    '''implemented from welfords algorithm on wikipedia'''
     # start with n - 1 'active' cells one above the diagonal
     n = A.shape[0]
     (W, M, M2) = init_agg_matrices(A)
@@ -91,7 +91,20 @@ def detect_cluster_structure(A:np.ndarray, sigma_tolerance = 0.05, debug=False):
     (W, M, M2) = init_agg_matrices(A)
     matrices = (W, M, M2)
     total_mean = np.mean(A)
-    total_var = np.var(A)
+    total_var = np.var(A, ddof=1)
+
+    def eval_local_stats(r,c):
+        '''evaluate the local mean and variance'''
+        padding = 1
+        bound_r = max(r-padding, 0)
+        bound_c = min(c+padding, n-1)
+        diag_start = min(bound_r, bound_c)
+        diag_end = max(bound_r, bound_c) + 1
+        local_region = A[diag_start:diag_end,diag_start:diag_end]
+        local_mean = np.mean(local_region)
+        local_var = np.var(local_region)
+        loc_min = np.min(local_region)
+        return (local_mean, local_var, loc_min)
 
     for d in range(1, n):
         for k in range(0,n - d):
@@ -101,10 +114,14 @@ def detect_cluster_structure(A:np.ndarray, sigma_tolerance = 0.05, debug=False):
                 existing_agg = infer_aggregates(matrices, r, c)
                 (ex_cu_weight, ex_mean, ex_moo2) = existing_agg
                 variance = ex_moo2 / ex_cu_weight
-                distance = abs(ex_mean - A[r,c])
                 if d == 1:
-                    should_include = A[r,c] > total_mean + np.sqrt(total_var) # maybe think of a better one
+                    (loc_mean, loc_var, loc_min) = eval_local_stats(r,c)
+                    loc_size = 16
+                    should_include = A[r,c] > (
+                        (loc_min * loc_size + total_mean * n) / (loc_size + n)
+                    ) + np.sqrt(loc_var)  # if very noisy threshold is higher, if not noisy threshold is lower
                 else:
+                    distance = abs(ex_mean - A[r,c])
                     should_include = distance < np.sqrt(1 / variance) * sigma_tolerance # 1 / var should be used rather than variance otherwise very uniform groups would have tight thresholds and messy groups have very loose thresholds. This creates clusters exactly where they shouldnt be. (between two squares)
                 if should_include:
                     if d == 1:
@@ -119,4 +136,34 @@ def detect_cluster_structure(A:np.ndarray, sigma_tolerance = 0.05, debug=False):
                     M2[r,c] = moo2
                     M2[c,r] = moo2
     return (W, M, M2) if debug else W > 0.5
+
+def detect_cluster_basecase_test(A:np.ndarray, sigma_tolerance):
+    n = A.shape[0]
+    C = np.zeros(A.shape)
+    np.fill_diagonal(C, 1)
+    def eval_local_stats(r,c):
+        '''evaluate the local mean and variance'''
+        padding = 1
+        bound_r = max(r-padding, 0)
+        bound_c = min(c+padding, n-1)
+        diag_start = min(bound_r, bound_c)
+        diag_end = max(bound_r, bound_c) + 1
+        local_region = A[diag_start:diag_end,diag_start:diag_end]
+        local_mean = np.mean(local_region)
+        local_var = np.var(local_region)
+        return (local_mean, local_var)
+    
+    total_mean = np.mean(A)
+    total_var = np.var(A)
+
+    for d in range(1, 2):
+        for k in range(0,n - d):
+            r = k
+            c = d + k
+            (loc_mean, loc_var) = eval_local_stats(r,c)
+            if np.abs(A[r,c] - loc_mean) < 1 / np.sqrt(loc_var) * sigma_tolerance:
+                C[r,c] = 1
+                C[c,r] = 1
+    return C
+            
 
