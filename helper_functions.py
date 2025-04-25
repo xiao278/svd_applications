@@ -43,7 +43,7 @@ def mean_from_diag(A:np.ndarray):
     N = size_from_diag(A)
     return S / N
 
-def var_from_diag(A:np.ndarray):
+def var_from_diag(A:np.ndarray, diag_zeroes=False):
     assert A.ndim == 2
     assert A.shape[0] == A.shape[1]
     n = A.shape[0]
@@ -55,7 +55,10 @@ def var_from_diag(A:np.ndarray):
     V = (
         (sum_squared) - (N * np.square(M))
     ) / (N - 1)
-    np.fill_diagonal(V,np.diag(V,k=1) / 2)
+    if not diag_zeroes:
+        np.fill_diagonal(V,np.diag(V,k=1) / 2)
+    else:
+        np.fill_diagonal(V,0)
     V = np.clip(V, a_min=0, a_max=None)
     return V
 
@@ -132,7 +135,8 @@ def calc_cutoff_index(svs:list[float]):
 # ])
 # should be [-12.27178365  -5.36541382 -11.51601249 -12.90901428 -13.90901428]
 
-def detect_cluster_structure(A:np.ndarray, sigma_tolerance):
+def detect_cluster_structure_old(A:np.ndarray, sigma_tolerance):
+    '''deprecated'''
     # start with n - 1 'active' cells one above the diagonal
     n = A.shape[0]
     C = np.zeros(A.shape)
@@ -162,10 +166,9 @@ def detect_cluster_structure(A:np.ndarray, sigma_tolerance):
                 C[c,r] = 0
     return C
 
-def find_clusters(A:np.ndarray, sigma_tolerance = 1):
-    structure = detect_cluster_structure(A, sigma_tolerance=sigma_tolerance)
+def find_clusters(structure:np.ndarray):
     clusters = []
-    n = A.shape[0]
+    n = structure.shape[0]
     cursor_row = 0
     cursor_col = 0
     prev_move_right = False
