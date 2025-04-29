@@ -1,4 +1,5 @@
 import numpy as np
+import heapq
 from scipy.stats import norm
 
 def sum_from_diag(A:np.ndarray):
@@ -168,5 +169,46 @@ def compute_cosine_matrix(S:np.ndarray,V:np.ndarray,m,n):
             CM[j,i] = cosine
     np.fill_diagonal(CM, 1)
     return CM
-            
-        
+
+class Partition:
+    def __init__(self):
+        self.last_node = 0
+        self.span = 0
+        self.clusters:list[range] = []
+
+    def __lt__(self, other:'Partition'):
+        return self.last_node < other.last_node
+    
+    def add_cluster(self, cluster:range):
+        assert self.can_add(cluster)
+        self.clusters.append(cluster)
+        self.last_node = cluster.stop
+        self.span += cluster.stop - cluster.start
+    
+    def can_add(self, cluster:range):
+        return self.last_node <= cluster.start
+
+def partition_clusters(clusters:list[range]):
+    # cluster already sorted by end time
+    heap = [Partition()]
+    for cluster in clusters:
+        best_partition = heap[0]
+        if best_partition.can_add(cluster):
+            heapq.heappop(heap)
+            best_partition.add_cluster(cluster)
+            heapq.heappush(heap, best_partition)
+        else: 
+            new_partition = Partition()
+            new_partition.add_cluster(cluster)
+            heapq.heappush(heap, new_partition)
+    heap.sort(key = lambda item: item.span, reverse=True)
+    for h in heap:
+        print(h.clusters, h.span)
+    cluster_partitions = [p.clusters for p in heap]
+    
+    num_clusters = [len(cp) for cp in cluster_partitions]
+    prev_clusters = np.roll(num_clusters, 1)
+    prev_clusters[0] = 0
+    prev_clusters = np.cumsum(prev_clusters)
+    return (cluster_partitions, prev_clusters)
+

@@ -67,8 +67,7 @@ def spiral_clustered_positioning(G:networkx.Graph, INDEX:list[int], resolution=0
     pos = networkx.spiral_layout(reordered_graph, resolution=resolution)
     return pos
 
-
-def get_colormappings(G:networkx.Graph, INDEX:list[int], clusters:list[dict], cmap_name='Set3'):
+def get_colormappings(G:networkx.Graph, INDEX:list[int], clusters:list[dict], cmap_name='Set3', no_group_color='white', total_clusters=-1, prev_clusters=0):
     (node_to_index, index_to_node) = get_mappings(G)
     group_labels = {}
     for node in G.nodes:
@@ -79,9 +78,11 @@ def get_colormappings(G:networkx.Graph, INDEX:list[int], clusters:list[dict], cm
             node = index_to_node[index]
             group_labels[node] = i + 1
     unique_groups = set(group_labels.values())
-    colors = matplotlib.cm.get_cmap(cmap_name, len(unique_groups))
-    color_map = {group: colors(i) for i, group in enumerate(unique_groups)} # color assigned to each group label
-    node_colors = ['lightgray' if group_labels[node] == 0 else color_map[group_labels[node]] for node in G.nodes]
+    colors = matplotlib.cm.get_cmap(cmap_name, len(unique_groups) if total_clusters < 1 else total_clusters + 1)
+    color_map = {group: colors(
+        i if total_clusters < 1 else prev_clusters + i
+    ) for i, group in enumerate(unique_groups)} # color assigned to each group label
+    node_colors = [no_group_color if group_labels[node] == 0 else color_map[group_labels[node]] for node in G.nodes]
     edge_colors = []
     for u, v in G.edges():
         u_group = group_labels[u]
